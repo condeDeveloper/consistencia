@@ -1,0 +1,51 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ${{ matrix.so }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        so: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # O juiz e a BUSCA EXAUSTIVA por uma linearizacao, que e a definicao de
+      # Herlihy e Wing escrita como algoritmo. Ela e exponencial e exata, e so
+      # cabe em historias de poucas dezenas de operacoes, que e exatamente o
+      # tamanho em que a violacao ja aparece e a busca ainda termina.
+      #
+      # Rodar em tres sistemas importa porque o gerador de sorteio e escrito
+      # aqui: se a sequencia mudasse entre sistemas, os intercalamentos seriam
+      # outros e "188 de 200 historias linearizaveis" nao seria comparavel com
+      # nada.
+      - name: testes
+        run: dotnet test testes/Consistencia.Testes/Consistencia.Testes.csproj -c Release --nologo -v q
+
+      - name: o juiz e a hierarquia
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- juiz
+
+      # A regra R + W maior que N entrega leituras REGULARES e nao entrega
+      # linearizabilidade: ela nao diz nada sobre duas leituras seguidas.
+      - name: o quorum contra o juiz
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- quorum
+
+      - name: o que o usuario sente
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- sessao
+
+      - name: o reparo de leitura
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- reparo
+
+      - name: concorrencia e linearizabilidade
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- concorrencia
